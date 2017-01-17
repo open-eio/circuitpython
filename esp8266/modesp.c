@@ -634,9 +634,9 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_0(esp_flash_size_obj, esp_flash_size);
 
 STATIC mp_obj_t esp_flash_user_start(void) {
     if (IS_OTA_FIRMWARE()) {
-        return MP_OBJ_NEW_SMALL_INT(0x3c000 + 0x90000);
+        return MP_OBJ_NEW_SMALL_INT(0x3c000 + 0x91000);
     } else {
-        return MP_OBJ_NEW_SMALL_INT(0x90000);
+        return MP_OBJ_NEW_SMALL_INT(0x91000);
     }
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(esp_flash_user_start_obj, esp_flash_user_start);
