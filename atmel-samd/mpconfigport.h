@@ -51,7 +51,7 @@
 #define MICROPY_PY_ATTRTUPLE        (1)
 #define MICROPY_PY_COLLECTIONS      (1)
 #define MICROPY_PY_DESCRIPTORS      (1)
-#define MICROPY_PY_FRAMEBUF         (1)
+#define MICROPY_PY_FRAMEBUF         (0)
 #define MICROPY_PY_MATH             (1)
 #define MICROPY_PY_CMATH            (0)
 #define MICROPY_PY_IO               (0)
@@ -70,6 +70,7 @@
 #define MICROPY_FATFS_RPATH            (2)
 #define MICROPY_FATFS_VOLUMES          (4)
 #define MICROPY_FATFS_MULTI_PARTITION  (1)
+#define MICROPY_FATFS_NUM_PERSISTENT   (1)
 #define MICROPY_FSUSERMOUNT            (1)
 // Only enable this if you really need it. It allocates a byte cache of this
 // size.
@@ -86,8 +87,11 @@
 #define MICROPY_USE_INTERNAL_PRINTF (1)
 #define MICROPY_PY_SYS_STDFILES     (1)
 #define MICROPY_PY_IO_FILEIO        (1)
+#define MICROPY_READER_FATFS        (1)
 #define MICROPY_PERSISTENT_CODE_LOAD (1)
 #define MICROPY_PY_BUILTINS_STR_UNICODE (1)
+
+#define MICROPY_KBD_EXCEPTION       (1)
 
 // type definitions for the specific machine
 
@@ -172,7 +176,6 @@ extern const struct _mp_obj_module_t samd_module;
 #define MICROPY_PORT_ROOT_POINTERS \
     const char *readline_hist[8]; \
     vstr_t *repl_line; \
-    mp_obj_t mp_kbd_exception; \
     FLASH_ROOT_POINTERS \
 
 bool udi_msc_process_trans(void);

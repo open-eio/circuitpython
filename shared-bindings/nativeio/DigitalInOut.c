@@ -136,9 +136,20 @@ MP_DEFINE_CONST_FUN_OBJ_KW(nativeio_digitalinout_switch_to_output_obj, 1, native
 
 //|   .. method:: switch_to_input(pull=None)
 //|
-//|       Switch to read in digital values.
+//|     Switch to read in digital values.
 //|
-//|       :param Pull pull: pull configuration for the input
+//|     :param Pull pull: pull configuration for the input
+//|
+//|     Example usage::
+//|
+//|       import nativeio
+//|       import board
+//|
+//|       with nativeio.DigitalInOut(board.SLIDE_SWITCH) as switch:
+//|         switch.switch_to_input(pull=nativeio.DigitalInOut.Pull.up)
+//|         # Or, after switch_to_input
+//|         switch.pull = nativeio.DigitalInOut.Pull.up
+//|         print(switch.value)
 //|
 typedef struct {
     mp_obj_base_t base;
@@ -149,7 +160,7 @@ extern const nativeio_digitalinout_pull_obj_t nativeio_digitalinout_pull_down_ob
 STATIC mp_obj_t nativeio_digitalinout_switch_to_input(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
    enum { ARG_pull };
    static const mp_arg_t allowed_args[] = {
-       { MP_QSTR_value,      MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_rom_obj = mp_const_none} },
+       { MP_QSTR_pull,      MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_rom_obj = mp_const_none} },
    };
    nativeio_digitalinout_obj_t *self = MP_OBJ_TO_PTR(pos_args[0]);
    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
@@ -291,14 +302,20 @@ STATIC mp_obj_t nativeio_digitalinout_obj_get_pull(mp_obj_t self_in) {
 }
 MP_DEFINE_CONST_FUN_OBJ_1(nativeio_digitalinout_get_pull_obj, nativeio_digitalinout_obj_get_pull);
 
-STATIC mp_obj_t nativeio_digitalinout_obj_set_pull(mp_obj_t self_in, mp_obj_t pull) {
+STATIC mp_obj_t nativeio_digitalinout_obj_set_pull(mp_obj_t self_in, mp_obj_t pull_obj) {
    nativeio_digitalinout_obj_t *self = MP_OBJ_TO_PTR(self_in);
    if (common_hal_nativeio_digitalinout_get_direction(self) == DIRECTION_OUT) {
        nlr_raise(mp_obj_new_exception_msg(&mp_type_OSError,
            "Pull not used when direction is output."));
        return mp_const_none;
    }
-   common_hal_nativeio_digitalinout_set_pull(self, (enum digitalinout_pull_t) MP_OBJ_SMALL_INT_VALUE(pull));
+   enum digitalinout_pull_t pull = PULL_NONE;
+   if (pull_obj == &nativeio_digitalinout_pull_up_obj) {
+       pull = PULL_UP;
+   } else if (pull_obj == &nativeio_digitalinout_pull_down_obj) {
+       pull = PULL_DOWN;
+   }
+   common_hal_nativeio_digitalinout_set_pull(self, pull);
    return mp_const_none;
 }
 MP_DEFINE_CONST_FUN_OBJ_2(nativeio_digitalinout_set_pull_obj, nativeio_digitalinout_obj_set_pull);

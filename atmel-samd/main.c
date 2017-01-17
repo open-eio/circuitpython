@@ -125,8 +125,6 @@ void reset_mp(void) {
     mp_obj_list_append(mp_sys_path, MP_OBJ_NEW_QSTR(MP_QSTR__slash_flash));
     mp_obj_list_append(mp_sys_path, MP_OBJ_NEW_QSTR(MP_QSTR__slash_flash_slash_lib));
     mp_obj_list_init(mp_sys_argv, 0);
-
-    MP_STATE_PORT(mp_kbd_exception) = mp_obj_new_exception(&mp_type_KeyboardInterrupt);
 }
 
 #ifdef EXPRESS_BOARD
@@ -307,6 +305,8 @@ bool start_mp(void) {
                     new_status_color(NAME_ERROR);
                 } else if (mp_obj_is_subclass_fast(result.exception_type, &mp_type_OSError)) {
                     new_status_color(OS_ERROR);
+                } else if (mp_obj_is_subclass_fast(result.exception_type, &mp_type_ValueError)) {
+                    new_status_color(VALUE_ERROR);
                 } else {
                     new_status_color(OTHER_ERROR);
                 }
@@ -426,7 +426,6 @@ int main(int argc, char **argv) {
     // stack so the GC can account for objects that may be referenced by the
     // stack between here and where gc_collect is called.
     stack_top = (char*)&stack_dummy;
-    reset_mp();
 
     // Initialise the local flash filesystem after the gc in case we need to
     // grab memory from it. Create it if needed, mount in on /flash, and set it
@@ -456,9 +455,9 @@ int main(int argc, char **argv) {
         if (exit_code == PYEXEC_FORCED_EXIT) {
             if (!first_run) {
                 mp_hal_stdout_tx_str("soft reboot\r\n");
-                reset_samd21();
-                reset_mp();
             }
+            reset_samd21();
+            reset_mp();
             first_run = false;
             skip_repl = start_mp();
         } else if (exit_code != 0) {
@@ -480,16 +479,6 @@ void gc_collect(void) {
     gc_collect_end();
 }
 
-mp_lexer_t *fat_vfs_lexer_new_from_file(const char *filename);
-mp_lexer_t *mp_lexer_new_from_file(const char *filename) {
-    #if MICROPY_VFS_FAT
-    return fat_vfs_lexer_new_from_file(filename);
-    #else
-    (void)filename;
-    return NULL;
-    #endif
-}
-
 mp_import_stat_t fat_vfs_import_stat(const char *path);
 mp_import_stat_t mp_import_stat(const char *path) {
     #if MICROPY_VFS_FAT
@@ -498,10 +487,6 @@ mp_import_stat_t mp_import_stat(const char *path) {
     (void)path;
     return MP_IMPORT_STAT_NO_EXIST;
     #endif
-}
-
-void mp_keyboard_interrupt(void) {
-    MP_STATE_VM(mp_pending_exception) = MP_STATE_PORT(mp_kbd_exception);
 }
 
 void nlr_jump_fail(void *val) {
