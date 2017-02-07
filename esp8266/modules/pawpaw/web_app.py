@@ -4,16 +4,17 @@ try:
 except ImportError: 
     from ucollections import OrderedDict #micrpython specific
 
-from .socketserver    import TCPServer, StreamRequestHandler
+from .socketserver    import TCPServer
 from .http_server     import HttpRequestHandler
-from .template_engine import Template, LazyTemplate
 
 DEBUG = True
 ################################################################################
 # DECORATORS
 #-------------------------------------------------------------------------------
+#a method decorator to automate handling of HTTP route dispatching
 class route(object):
-    #a method decorator to automate handling of HTTP route dispatching
+    registered_routes = OrderedDict()
+
     def __init__(self, path, methods = None):
         #this runs upon decoration
         self.path = path
@@ -23,47 +24,43 @@ class route(object):
         
     def __call__(self, m):
         #this runs upon decoration immediately after __init__
-        def wrapped_m(*args): #pull in request object
+        def wrapped_m(*args):
             return m(*args)
         #add the wrapped method to the handler_registry with path as key
-        wrapped_m.route_handles = []
         for req_method in self.req_methods:
             key = "%s %s" % (req_method, self.path)
-            wrapped_m.route_handles.append(key)
+            print("@route REGISTERING HANDLER '%s'" % (key,))
+            self.registered_routes[key] = wrapped_m
         return wrapped_m
 
+#a method decorator which creates a class-private Routing HttpRequestHandler
+def Router(cls):
+    class RoutingRequestHandler(HttpRequestHandler):
+            pass    
+    #update the private class to contain all currently registered routes
+    RoutingRequestHandler.handler_registry = route.registered_routes.copy()
+    #cache the private class
+    cls._RoutingRequestHandler = RoutingRequestHandler
+    #remove the registered_routes from the route decorator class 
+    #attribute space, this allows for independent routing WebApp instances
+    route.registered_routes = OrderedDict()
+    return cls
+
+
+        
 ################################################################################
 # Classes
 class WebApp(object):
-    class RoutingRequestHandler(HttpRequestHandler):
-            pass
-
     def __init__(self, server_addr, server_port):
         # Create the server, binding to localhost on port 9999
         self.server_addr = server_addr
         self.server_port = server_port
-        self._register_routes()
-        self.server = TCPServer((self.server_addr, self.server_port), self.RoutingRequestHandler)
+        self._server = TCPServer((self.server_addr, self.server_port), self._RoutingRequestHandler)
         
-    def _register_routes(self):
-        if DEBUG:
-            print("@PawpawApp.register_routes")
-        #a class decorator to automate handling of HTTP route dispatching
-        for name, method in type(self).__dict__.items():
-            if hasattr(method, "route_handles"):
-                # transform the method into a handler
-                # (behaves like method of RoutingRequestHandler)
-                def route_handler(context,app=self):
-                    return method(app,context)
-                if DEBUG:
-                    print("@PawpawApp.register_routes REGISTERING HANDLER METHOD '%s'" % (name,))
-                for key in method.route_handles:
-                    self.RoutingRequestHandler.handler_registry[key] = route_handler
-
     def serve_forever(self):
         # Activate the server; this will keep running until you
         # interrupt the program with Ctrl-C
-        self.server.serve_forever()
+        self._server.serve_forever()
 
 ################################################################################
 # TEST  CODE
@@ -82,6 +79,7 @@ class WebApp(object):
 #    PINS = OrderedDict((i,machine.Pin(i, machine.Pin.IN)) for i in PIN_NUMBERS)
 #    
 #    #---------------------------------------------------------------------------
+#    @Router
 #    class PinServer(PawpawApp):
 #        @route("/", methods=['GET','POST'])
 #        def pins(self, context):
