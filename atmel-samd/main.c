@@ -22,6 +22,8 @@
 #include "asf/sam0/drivers/system/system.h"
 #include <board.h>
 
+#include "common-hal/nativeio/AnalogIn.h"
+
 #ifdef EXPRESS_BOARD
 #include "common-hal/nativeio/types.h"
 #include "QTouch/touch_api_ptc.h"
@@ -87,7 +89,7 @@ void init_flash_fs(void) {
         }
 
         // set label
-        f_setlabel("MICROPYTHON");
+        f_setlabel("CIRCUITPY");
 
         if (usb_writeable) {
             vfs->flags |= FSUSER_USB_WRITEABLE;
@@ -156,6 +158,12 @@ void reset_samd21(void) {
     selfcap_config.num_channels = 0;
     selfcap_config.num_sensors = 0;
 #endif
+
+    analogin_reset();
+
+    // Wait for the DAC to sync.
+    while (DAC->STATUS.reg & DAC_STATUS_SYNCBUSY) {}
+    DAC->CTRLA.reg |= DAC_CTRLA_SWRST;
 
     struct system_pinmux_config config;
     system_pinmux_get_config_defaults(&config);
