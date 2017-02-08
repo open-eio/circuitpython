@@ -9,7 +9,7 @@ from .socketserver import TCPServer, StreamRequestHandler
 from .template_engine import Template, LazyTemplate
 
 DEBUG = False
-#DEBUG = True
+DEBUG = True
 ################################################################################
 # Classes
 class HttpRequest(object):
@@ -25,8 +25,14 @@ class HttpRequestHandler(StreamRequestHandler):
     def render_template(self, tmp,
                         status  = "HTTP/1.1 200 OK",
                         headers = None):
+        global DEBUG
         if DEBUG:
             print("INSIDE METHOD name='%s' " % ('render_template'))
+            try:
+                from micropython import mem_info
+                mem_info()
+            except ImportError:
+                pass
         if headers is None:
             headers = OrderedDict()
         headers['Content-Type'] = headers.get('Content-Type', 'text/html')
@@ -60,8 +66,16 @@ class HttpRequestHandler(StreamRequestHandler):
             self._send_response_headers(status, headers)
             #send all at once
             self._send(content)
+        if DEBUG:
+            print("LEAVING METHOD name='%s' " % ('render_template'))
+            try:
+                from micropython import mem_info
+                mem_info()
+            except ImportError:
+                pass
             
     def _send_response_headers(self, status, headers):
+        global DEBUG
         if DEBUG:
             print("INSIDE METHOD name='%s' " % ('_send_response_headers'))
         self._send_line(status)
@@ -72,12 +86,14 @@ class HttpRequestHandler(StreamRequestHandler):
         self._send_line("")
         
     def _send(self, content):
+        global DEBUG
         if DEBUG:
             print("INSIDE METHOD name='%s' " % ('_send'))
         self.wfile.write(bytes(content,'utf8'))
         self.wfile.flush()
         
     def _send_line(self, line):
+        global DEBUG
         if DEBUG:
             print("INSIDE METHOD name='%s'" % ('_send_line'))
         line = line.rstrip()
@@ -88,6 +104,7 @@ class HttpRequestHandler(StreamRequestHandler):
         self.wfile.flush()
         
     def _send_chunk(self, chunk):
+        global DEBUG
         if DEBUG:
             print("INSIDE METHOD name='%s'" % ('_send_chunk'))
         self.wfile.write(bytes("%X%s" % (len(chunk),self.newline),'utf8'))
@@ -96,13 +113,24 @@ class HttpRequestHandler(StreamRequestHandler):
     
     def handle(self):
         global DEBUG
+        if DEBUG:
+            print("INSIDE HttpRequestHandler.handle")
+            try:
+                from micropython import mem_info
+                mem_info()
+            except ImportError:
+                pass
         # self.rfile is a file-like object created by the handler;
         # we can now use e.g. readline() instead of raw recv() calls
         #parse the request header
         request_line = str(self.rfile.readline(),'utf8').strip()
         if DEBUG:
             print("CLIENT: %s" % request_line)
-        method, req, protocol = request_line.split()
+        try:
+            method, req, protocol = request_line.split()
+        except ValueError:
+            self.handle_malformed_request_line(request_line)
+            return
         #split off any params if they exist
         req = req.split("?")
         req_path = req[0]
@@ -138,15 +166,20 @@ class HttpRequestHandler(StreamRequestHandler):
             handler = self.__class__.handle_default
         if DEBUG:
             print("DISPATCHING REQUEST key='%s' to handler=%r" % (key,handler))
-        #call the handler
-        handler(self)
+        #call the handler, passing self as context
+        context = self
+        handler(context)
         
     def handle_default(self):
         if DEBUG:
             print("INSIDE HANDLER name='%s' " % ('handle_default'))
-        tmp = LazyTemplate.from_file("templates/404.html_template")
+        tmp = LazyTemplate.from_file("templates/404.html")
         self.render_template(tmp)
-
+        
+    def handle_malformed_request_line(self, request_line = ""):
+        if DEBUG:
+            print("INSIDE HANDLER name='%s' " % ('handle_malformed_request_line'))
+        print("WARNING: got malformed request_line '%s'" % request_line)
 ################################################################################
 # TEST  CODE
 ################################################################################

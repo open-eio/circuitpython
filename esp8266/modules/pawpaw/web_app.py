@@ -11,6 +11,7 @@ DEBUG = True
 ################################################################################
 # DECORATORS
 #-------------------------------------------------------------------------------
+# @route
 #a method decorator to automate handling of HTTP route dispatching
 class route(object):
     registered_routes = OrderedDict()
@@ -24,40 +25,71 @@ class route(object):
         
     def __call__(self, m):
         #this runs upon decoration immediately after __init__
-        def wrapped_m(*args):
-            return m(*args)
-        #add the wrapped method to the handler_registry with path as key
+        #add the method to the handler_registry with path as key
         for req_method in self.req_methods:
             key = "%s %s" % (req_method, self.path)
-            print("@route REGISTERING HANDLER '%s'" % (key,))
-            self.registered_routes[key] = wrapped_m
-        return wrapped_m
+            if DEBUG:
+                print("@route REGISTERING HANDLER '%s' on method '%s'" % (key,m))
+            self.registered_routes[key] = m
+        return m
 
-#a method decorator which creates a class-private Routing HttpRequestHandler
+#-------------------------------------------------------------------------------
+# @Router
+#a class decorator which creates a class-private Routing HttpRequestHandler
 def Router(cls):
+    if DEBUG:
+        print("@Router: wrapping class '%s'" % cls)
+        
+    #this is a private class allowing independence of wrapped WebApp classes
     class RoutingRequestHandler(HttpRequestHandler):
-            pass    
-    #update the private class to contain all currently registered routes
-    RoutingRequestHandler.handler_registry = route.registered_routes.copy()
-    #cache the private class
-    cls._RoutingRequestHandler = RoutingRequestHandler
+            pass
+            
+    class RouterWrapped(cls):
+        #update the private class to contain all currently registered routes
+        _handler_registry = route.registered_routes.copy()
+        def __init__(self,*args,**kwargs):
+            if not kwargs.get("MyHttpRequestHandler") is None:
+                print("Warning: @Router will overwrite 'MyHttpRequestHandler'")
+            #bind self to all of the route handlers
+            for key, handler in type(self)._handler_registry.items():
+                RoutingRequestHandler.handler_registry[key] = lambda context: handler(self,context)
+            kwargs['MyHttpRequestHandler'] = RoutingRequestHandler
+            cls.__init__(self,*args, **kwargs)
+    
     #remove the registered_routes from the route decorator class 
     #attribute space, this allows for independent routing WebApp instances
     route.registered_routes = OrderedDict()
-    return cls
+    return RouterWrapped
 
-
-        
 ################################################################################
 # Classes
+#-------------------------------------------------------------------------------
 class WebApp(object):
-    def __init__(self, server_addr, server_port):
+    def __init__(self, server_addr, server_port, MyHttpRequestHandler = None):
+        if DEBUG:
+            print("INSIDE WebApp.__init__")
+            try:
+                from micropython import mem_info
+                mem_info()
+            except ImportError:
+                pass
+            
+        if MyHttpRequestHandler is None:
+            MyHttpRequestHandler = HttpRequestHandler #default handler
         # Create the server, binding to localhost on port 9999
         self.server_addr = server_addr
         self.server_port = server_port
-        self._server = TCPServer((self.server_addr, self.server_port), self._RoutingRequestHandler)
+        self._MyHttpRequestHandler = MyHttpRequestHandler
+        self._server = TCPServer((self.server_addr, self.server_port), MyHttpRequestHandler)
         
     def serve_forever(self):
+        if DEBUG:
+            print("INSIDE WebApp.serve_forever")
+            try:
+                from micropython import mem_info
+                mem_info()
+            except ImportError:
+                pass
         # Activate the server; this will keep running until you
         # interrupt the program with Ctrl-C
         self._server.serve_forever()

@@ -10,21 +10,43 @@ except ImportError:
 
 from time import monotonic as time
 
-__all__ = ["BaseServer", "TCPServer","BaseRequestHandler", 
-           "StreamRequestHandler"]
+DEBUG = True
 
-class BaseServer:
+__all__ = ["TCPServer","StreamRequestHandler"]
+
+class TCPServer(object):
     timeout = None
+    address_family = socket.AF_INET
+    socket_type = socket.SOCK_STREAM
+    request_queue_size = 5
+    allow_reuse_address = True
 
-    def __init__(self, server_address, RequestHandlerClass):
+    def __init__(self, server_address, RequestHandlerClass, bind_and_activate=True):
+        #BaseServer.__init__(self, server_address, RequestHandlerClass)
         self.server_address = server_address
         self.RequestHandlerClass = RequestHandlerClass
         self.__is_shut_down = None #FIXME threading.Event()
         self.__shutdown_request = False
+        
+        self.socket = socket.socket(self.address_family,
+                                    self.socket_type)
+        if bind_and_activate:
+            try:
+                self.server_bind()
+                self.server_activate()
+            except:
+                self.server_close()
+                raise
 
-    def server_activate(self):
-        pass
+    #inserted from old BaseServer
+    def __enter__(self):
+        return self
 
+    #inserted from old BaseServer
+    def __exit__(self, *args):
+        self.server_close()
+        
+    #inserted from old BaseServer
     def serve_forever(self, poll_interval=0.5):
         #FIXME self.__is_shut_down.clear()
         try:
@@ -34,34 +56,49 @@ class BaseServer:
         finally:
             self.__shutdown_request = False
             #FIXME self.__is_shut_down.set()
-
+    
+    #inserted from old BaseServer
     def shutdown(self):
         self.__shutdown_request = True
         #FIXME self.__is_shut_down.wait()
 
+    #inserted from old BaseServer
     def service_actions(self):
         pass
+    
+    #inserted from old BaseServer
+    def verify_request(self, request, client_address):
+        return True
+        
+    #inserted from old BaseServer
+#    def handle_request(self):
+#        #FIXME timeout = self.socket.gettimeout()
+#        if timeout is None:
+#            timeout = self.timeout
+#        elif self.timeout is not None:
+#            timeout = min(timeout, self.timeout)
+#        if timeout is not None:
+#            deadline = time() + timeout
 
-    def handle_request(self):
-        #FIXME timeout = self.socket.gettimeout()
-        if timeout is None:
-            timeout = self.timeout
-        elif self.timeout is not None:
-            timeout = min(timeout, self.timeout)
-        if timeout is not None:
-            deadline = time() + timeout
-
-        while True:
-            ready = selector.select(timeout)
-            if ready:
-                return self._handle_request_noblock()
-            else:
-                if timeout is not None:
-                    timeout = deadline - time()
-                    if timeout < 0:
-                        return self.handle_timeout()
-
+#        while True:
+#            ready = selector.select(timeout)
+#            if ready:
+#                return self._handle_request_noblock()
+#            else:
+#                if timeout is not None:
+#                    timeout = deadline - time()
+#                    if timeout < 0:
+#                        return self.handle_timeout()
+    
+    #inserted from old BaseServer
     def _handle_request_noblock(self):
+        if DEBUG:
+            print("INSIDE TCPServer._handle_request_noblock")
+            try:
+                from micropython import mem_info
+                mem_info()
+            except ImportError:
+                pass
         try:
             request, client_address = self.get_request()
         except OSError:
@@ -73,65 +110,32 @@ class BaseServer:
                 self._exc = exc
                 self.handle_error(request, client_address)
                 self.shutdown_request(request)
-            except:
-                self.shutdown_request(request)
-                raise
         else:
             self.shutdown_request(request)
-
-    def handle_timeout(self):
-        pass
-
-    def verify_request(self, request, client_address):
-        return True
-
+    
+    #inserted from old BaseServer
     def process_request(self, request, client_address):
         self.finish_request(request, client_address)
         self.shutdown_request(request)
-
-    def server_close(self):
+    
+    def handle_timeout(self):
         pass
-
-    def finish_request(self, request, client_address):
-        self.RequestHandlerClass(request, client_address, self)
-
-    def shutdown_request(self, request):
-        self.close_request(request)
-
-    def close_request(self, request):
-        pass
-
+    
+    #inserted from old BaseServer
     def handle_error(self, request, client_address):
         print('-'*40, file=sys.stderr)
         print('Exception happened during processing of request from',
             client_address, file=sys.stderr)
         print_exception(self._exc,sys.stderr)
         print('-'*40, file=sys.stderr)
+    
+    #inserted from old BaseServer
+    def finish_request(self, request, client_address):
+        self.RequestHandlerClass(request, client_address, self)
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.server_close()
-
-
-class TCPServer(BaseServer):
-    address_family = socket.AF_INET
-    socket_type = socket.SOCK_STREAM
-    request_queue_size = 5
-    allow_reuse_address = True
-
-    def __init__(self, server_address, RequestHandlerClass, bind_and_activate=True):
-        BaseServer.__init__(self, server_address, RequestHandlerClass)
-        self.socket = socket.socket(self.address_family,
-                                    self.socket_type)
-        if bind_and_activate:
-            try:
-                self.server_bind()
-                self.server_activate()
-            except:
-                self.server_close()
-                raise
+    #inserted from old BaseServer
+    def shutdown_request(self, request):
+        self.close_request(request)
 
     def server_bind(self):
         if self.allow_reuse_address:
@@ -146,9 +150,6 @@ class TCPServer(BaseServer):
 
     def server_close(self):
         self.socket.close()
-
-    def fileno(self):
-        return None #FIXME self.socket.fileno()
 
     def get_request(self):
         return self.socket.accept()
@@ -165,7 +166,12 @@ class TCPServer(BaseServer):
     def close_request(self, request):
         request.close()
 
-class BaseRequestHandler:
+class StreamRequestHandler(object):
+    rbufsize = -1
+    wbufsize = -1
+
+    timeout = None
+    
     def __init__(self, request, client_address, server):
         self.request = request
         self.client_address = client_address
@@ -175,21 +181,6 @@ class BaseRequestHandler:
             self.handle()
         finally:
             self.finish()
-
-    def setup(self):
-        pass
-
-    def handle(self):
-        pass
-
-    def finish(self):
-        pass
-
-class StreamRequestHandler(BaseRequestHandler):
-    rbufsize = -1
-    wbufsize = -1
-
-    timeout = None
 
     def setup(self):
         self.connection = self.request
