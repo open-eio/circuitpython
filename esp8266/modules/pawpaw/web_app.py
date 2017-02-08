@@ -67,7 +67,9 @@ def Router(cls):
 class WebApp(object):
     def __init__(self, server_addr, server_port, MyHttpRequestHandler = None):
         if DEBUG:
-            print("INSIDE WebApp.__init__")
+            print("INSIDE WebApp.__init__:")
+            print("\tserver_addr: %s" % server_addr)
+            print("\tserver_port: %s" % server_port)
             try:
                 from micropython import mem_info
                 mem_info()

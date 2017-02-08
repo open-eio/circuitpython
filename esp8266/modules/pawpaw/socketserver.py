@@ -155,13 +155,11 @@ class TCPServer(object):
         return self.socket.accept()
 
     def shutdown_request(self, request):
-        try:
-            #explicitly shutdown.  socket.close() merely releases
-            #the socket and waits for GC to perform the actual close.
-            request.shutdown(socket.SHUT_WR)
-        except OSError:
-            pass #some platforms may raise ENOTCONN here
+        #explicitly shutdown.  socket.close() merely releases
+        #the socket and waits for GC to perform the actual close.
         self.close_request(request)
+        import gc
+        gc.collect()
 
     def close_request(self, request):
         request.close()
@@ -194,15 +192,14 @@ class StreamRequestHandler(object):
             self.wfile = self.connection.makefile('wb', self.wbufsize)
 
     def finish(self):
-        if not self.wfile.closed:
-            try:
-                self.wfile.flush()
-            except socket.error:
-                # A final socket error may have occurred here, such as
-                # the local error ECONNABORTED.
-                pass
-        self.wfile.close()
-        self.rfile.close()
+        try:
+            self.wfile.close()
+            self.rfile.close()
+        except socket.error:
+            # A final socket error may have occurred here, such as
+            # the local error ECONNABORTED.
+            pass
+   
 
 ################################################################################
 # TEST CODE
