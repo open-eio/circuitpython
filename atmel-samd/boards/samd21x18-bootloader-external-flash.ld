@@ -28,9 +28,14 @@ SECTIONS
 
         . = ALIGN(4);
         _etext = .;        /* define a global symbol at end of code */
-        _sidata = _etext;  /* This is used by the startup in order to initialize the .data secion */
     } >FLASH
 
+    .ARM.exidx :
+    {
+        *(.ARM.exidx*)
+        *(.gnu.linkonce.armexidx.*)
+        _sidata = .;  /* This is used by the startup in order to initialize the .data section */
+    } > FLASH
 
     /* This is the initialized data section
     The program executes knowing that the data is in the RAM
