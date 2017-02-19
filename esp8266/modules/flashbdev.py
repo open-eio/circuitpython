@@ -3,7 +3,7 @@ import esp
 class FlashBdev:
 
     SEC_SIZE = 4096
-    RESERVED_SECS = 16 #needed for user native code extensions 
+    RESERVED_SECS = 20 #needed for user native code extensions 
                        #NOTE: will destroy existing filesystems built with previous commits
                        #NOTE: might not work with 1-Mbit flash size devices and OTA firmware 
     START_SEC = esp.flash_user_start() // SEC_SIZE + RESERVED_SECS
